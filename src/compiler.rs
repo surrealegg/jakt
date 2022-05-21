@@ -113,6 +113,37 @@ impl Compiler {
         Ok(())
     }
 
+    pub fn convert_from_str_to_cpp(&mut self, input: &str) -> Result<String, JaktError> {
+        let mut project = Project::new();
+        let err = self.include_prelude(&mut project);
+        if let Some(err) = err {
+            return Err(err);
+        }
+
+        let (lexed, err) = lex(0, input.as_bytes());
+        if let Some(err) = err {
+            return Err(err);
+        }
+
+        let (file, err) = parse_namespace(&lexed, &mut 0);
+        if let Some(err) = err {
+            return Err(err);
+        }
+
+        let scope = Scope::new(Some(0));
+        project.scopes.push(scope);
+
+        let file_scope_id = project.scopes.len() - 1;
+
+        let err = typecheck_namespace(&file, file_scope_id, &mut project);
+
+        if let Some(err) = err {
+            return Err(err);
+        }
+
+        Ok(codegen(&project, &project.scopes[file_scope_id]))
+    }
+
     pub fn get_file_contents(&self, file_id: FileId) -> &[u8] {
         &self.raw_files[file_id].1
     }
